@@ -2,25 +2,36 @@ import requests
 import network
 import socket
 from time import sleep
-import machine
 import rp2
 import sys
 import credentials
+from PicoOLED13 import OLED_1inch3
+import time
+from machine import Pin, RTC
+import framebuf
+from weather_icons import icon01d, icon02d, icon03d, icon04d, icon09d, icon10d, icon11d, icon13d, icon50d
 
+keyA = Pin(15,Pin.IN,Pin.PULL_UP)
+keyB = Pin(17,Pin.IN,Pin.PULL_UP)
+
+OLED = OLED_1inch3()
 ssid = credentials.ssid
 password = credentials.password
 
 def connect():
-    #Connect to WLAN
+    print('Connecting to wifi...')
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
+
+    if wlan.isconnected():
+        wlan.disconnect()
+        sleep(1)
+
     wlan.connect(ssid, password)
     while wlan.isconnected() == False:
         print('Waiting for connection...')
-        sleep(1)    
-    ip = wlan.ifconfig()[0]
-    print(f'Connected on {ip}')
-    return ip
+        sleep(1)
+    print('Connection details: %s' % str(wlan.ifconfig()))
 
 
 def get_location():
@@ -39,16 +50,40 @@ def get_location():
                 lon = longitude[i]
                 location.append(lon)
                 found = True
-        print("Invalid option, please try again")
+        if found ==False:
+            print("Invalid option, please try again")
     return location
 
 
 def get_Weather(lat, lon, api_key):
-    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}"
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
     response = requests.get(url)
-    print(response)
+    if response.status_code == 200:
+        weather_data = response.json()
+        return  weather_data
+    else:
+        print("Failed to retrieve data: ", response.status_code)
+    response.close()
+    
+def display_weather(weather_info):
+    icons = [icon01d, icon02d, icon03d, icon04d, icon09d, icon10d, icon11d, icon13d, icon50d]
+    if weather_info:
+        weather = weather_info["weather"]
+        main = weather_info["main"]
+        icon_code = weather[0]["icon"]
+        for i in range(len(icons)):
+            if ("icon" + icon_code) == icons[i].__name__:
+                icon = icons[i]()
+                framebuffer_to_show = framebuf.FrameBuffer(icon, 32, 32, framebuf.MONO_HLSB)
+        OLED.text("Today's Weather", 5, 5, OLED.white)
+        OLED.text(f"{main["temp"]} C", 64, 28, OLED.white)
+        OLED.text(f"{weather[0]["description"]}", 5, 51, OLED.white)
+        OLED.blit(framebuffer_to_show,16,16)
+        OLED.show()  
 
 
 connect()
 location = get_location()
-get_Weather(location[0], location[1], credentials.weather_api)
+weather_info = get_Weather(location[0], location[1], credentials.weather_api)
+display_weather(weather_info)
+

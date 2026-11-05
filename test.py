@@ -49,6 +49,8 @@ OLED.text("Hello", 75, 24, OLED.white)
 OLED.text("World!", 75, 40, OLED.white)
 time.sleep(5)
 OLED.show()
+OLED.fill(0x0000)
+OLED.show()
 
 
 
