@@ -43,12 +43,6 @@ smiley = bytearray ([
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 ])
 
-framebuffer_to_show = framebuf.FrameBuffer(smiley, 64, 64, framebuf.MONO_HLSB)
-OLED.blit(framebuffer_to_show,0,0)
-OLED.text("Hello", 75, 24, OLED.white)
-OLED.text("World!", 75, 40, OLED.white)
-time.sleep(5)
-OLED.show()
 OLED.fill(0x0000)
 OLED.show()
 
