@@ -1,19 +1,17 @@
 import requests
 import network
-import socket
 from time import sleep
-import rp2
-import sys
 import credentials
 from PicoOLED13 import OLED_1inch3
-import time
 from machine import Pin, RTC
 import framebuf
 from weather_icons import icon01d, icon02d, icon03d, icon04d, icon09d, icon10d, icon11d, icon13d, icon50d
 import json
+import asyncio
 
 buttonA = Pin(15,Pin.IN,Pin.PULL_UP)
 buttonB = Pin(17,Pin.IN,Pin.PULL_UP)
+buttonC = Pin(16,Pin.IN,Pin.PULL_UP)
 
 OLED = OLED_1inch3()
 ssid = credentials.ssid
@@ -78,7 +76,6 @@ def status():
     while True:
         if buttonB.value() == 0:
             counter += 1
-            print("Counter: ", counter)
             if counter > 2:
                 counter = 0
         if counter == 0:
@@ -86,51 +83,83 @@ def status():
             OLED.hline(5, 45, 118, OLED.balck)
             OLED.hline(5, 60, 118, OLED.balck)
             OLED.show()
-            status = {"status": "Yay, sunshine!!"}
+            status = {"Status": "Yay, sunshine!!"}
             json_status = json.dumps(status)
         elif counter == 1:
             OLED.hline(5, 45, 118, OLED.white)
             OLED.hline(5, 30, 118, OLED.balck)
             OLED.hline(5, 60, 118, OLED.balck)
             OLED.show()
-            status = {"status": "Boring clouds..."}
+            status = {"Status": "Boring clouds..."}
             json_status = json.dumps(status)
         else:
             OLED.hline(5, 60, 118, OLED.white)
             OLED.hline(5, 30, 118, OLED.balck)
             OLED.hline(5, 45, 118, OLED.balck)
             OLED.show()
-            status = {"status": "Rain :("}
+            status = {"Status": "Rain :("}
             json_status = json.dumps(status)
         if buttonA.value() == 0:
+            break
+        if buttonC.value() == 0:
+            update_status(json_status)
             break
 def loading_screen():
     OLED.fill(0x0000)
     OLED.text("Loading...", 5, 28, OLED.white)
     OLED.show()
 
+def update_status(status):
+    url = f'https://api.jsonbin.io/v3/b/{credentials.bin_id}'
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Master-Key': credentials.master_key
+    }
+    data = status
+    print(data)
 
-    
-loading_screen()
-connect()
-city_name = get_location()
-buttonState = 0
-prevState = 0
-latchOn = True
-display_weather(get_Weather(city_name, credentials.weather_api))
-while True:
-    buttonState = buttonA.value()
-    if buttonState != prevState:
-        if buttonState == 1:
-            if latchOn == False:
-                latchOn = True
-            elif latchOn == True:
-                latchOn = False
-        if latchOn == True:
-            status()
-        else:
-            display_weather(get_Weather(city_name, credentials.weather_api))
-    prevState = buttonState
-    sleep(0.1)
+    req = requests.put(url, json=data, headers=headers)
+    print(req.text)
+
+PAGE = f"""
+            <!DOCTYPE html>
+            <html>
+            <form action="./get_location" method="get">
+            <label for="location">Enter your closest UK city:</label>
+            <input type="text" id="location" name="location"><br><br>
+            <input type="submit" value="Submit">
+            </form>
+            </body>
+            </html>
+            """
 
 
+async def display(city_name):   
+    buttonState = 0
+    prevState = 0
+    latchOn = True
+    display_weather(get_Weather(city_name, credentials.weather_api))
+    while True:
+        buttonState = buttonA.value()
+        if buttonState != prevState:
+            if buttonState == 1:
+                if latchOn == False:
+                    latchOn = True
+                elif latchOn == True:
+                    latchOn = False
+            if latchOn == True:
+                status()
+            else:
+                display_weather(get_Weather(city_name, credentials.weather_api))
+        prevState = buttonState
+        sleep(0.1)
+
+async def main():
+    loading_screen()
+    connect()
+    city_name = get_location()
+    asyncio.create_task(display(city_name))
+    while True:
+        await asyncio.sleep(10)
+
+asyncio.run(main())
