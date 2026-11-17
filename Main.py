@@ -1,4 +1,4 @@
-import requests
+import urequests as requests
 import network
 from time import sleep
 import credentials
@@ -16,6 +16,8 @@ buttonC = Pin(16,Pin.IN,Pin.PULL_UP)
 OLED = OLED_1inch3()
 ssid = credentials.ssid
 password = credentials.password
+
+user_city = None
 
 def connect():
     print('Connecting to wifi...')
@@ -56,7 +58,7 @@ def display_weather(weather_info):
         main = weather_info["main"]
         icon_code = weather[0]["icon"]
         for i in range(len(icons)):
-            if ("icon" + icon_code) == icons[i].__name__:
+            if ("icon" + icon_code[:-1] + "d") == icons[i].__name__:
                 icon = icons[i]()
                 framebuffer_to_show = framebuf.FrameBuffer(icon, 32, 32, framebuf.MONO_HLSB)
         OLED.fill(0x0000)
@@ -64,7 +66,7 @@ def display_weather(weather_info):
         OLED.text(f"{main["temp"]} C", 64, 28, OLED.white)
         OLED.text(f"{weather[0]["description"]}", 5, 51, OLED.white)
         OLED.blit(framebuffer_to_show,16,16)
-        OLED.show()  
+        OLED.show()
 def status():
     OLED.fill(0x0000)
     OLED.text("Update status:", 5, 5, OLED.white)
@@ -83,28 +85,25 @@ def status():
             OLED.hline(5, 45, 118, OLED.balck)
             OLED.hline(5, 60, 118, OLED.balck)
             OLED.show()
-            status = {"Status": "Yay, sunshine!!"}
-            json_status = json.dumps(status)
+            status = "Yay, sunshine!!"
         elif counter == 1:
             OLED.hline(5, 45, 118, OLED.white)
             OLED.hline(5, 30, 118, OLED.balck)
             OLED.hline(5, 60, 118, OLED.balck)
             OLED.show()
-            status = {"Status": "Boring clouds..."}
-            json_status = json.dumps(status)
+            status = "Boring clouds..."
         else:
             OLED.hline(5, 60, 118, OLED.white)
             OLED.hline(5, 30, 118, OLED.balck)
             OLED.hline(5, 45, 118, OLED.balck)
             OLED.show()
-            status = {"Status": "Rain :("}
-            json_status = json.dumps(status)
+            status = "Rain :("
         if buttonA.value() == 0:
             break
         if buttonC.value() == 0:
-            update_status(json_status)
+            update_status(status)
             break
-def loading_screen():
+async def loading_screen():
     OLED.fill(0x0000)
     OLED.text("Loading...", 5, 28, OLED.white)
     OLED.show()
@@ -115,24 +114,59 @@ def update_status(status):
         'Content-Type': 'application/json',
         'X-Master-Key': credentials.master_key
     }
-    data = status
-    print(data)
+    data = {"status": status}
 
     req = requests.put(url, json=data, headers=headers)
-    print(req.text)
 
-PAGE = f"""
+def webpage():
+    html = f"""
             <!DOCTYPE html>
-            <html>
-            <form action="./get_location" method="get">
-            <label for="location">Enter your closest UK city:</label>
-            <input type="text" id="location" name="location"><br><br>
-            <input type="submit" value="Submit">
-            </form>
-            </body>
-            </html>
-            """
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+    </head>
+    <body>
+                <form action="./get_location" method="get">
+                <label for="location">Enter your closest UK city:</label>
+                <input type="text" id="location" name="location"><br><br>
+                <input type="submit" value="Submit">
+                </form>
+    </body>
+    </html>
+                """
+    return str(html)
 
+
+async def handle_client(reader, writer):
+    try:
+        print("Client connected")
+        request_line = await reader.readline()
+        print("Request:", request_line)
+
+        while await reader.readline() != b"\r\n":
+            pass
+
+        request = str(request_line, 'utf-8').split("=")
+        if request[0].startswith("GET /get_location"):
+            location = request[1].strip() if len(request) > 1 else None
+            location = str(location).split(" ")
+            global user_city
+            user_city = location[0].lower().strip()
+            print("Location:", user_city)
+
+        response = webpage()
+        writer.write('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
+        writer.write(response)
+
+    except Exception as e:
+        print("Request error:", e)
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+    
 
 async def display(city_name):   
     buttonState = 0
@@ -155,9 +189,11 @@ async def display(city_name):
         sleep(0.1)
 
 async def main():
-    loading_screen()
     connect()
-    city_name = get_location()
+    await asyncio.start_server(handle_client, "0.0.0.0", 80)
+    while user_city is None:
+        await asyncio.create_task(loading_screen())
+    city_name = user_city
     asyncio.create_task(display(city_name))
     while True:
         await asyncio.sleep(10)
