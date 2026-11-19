@@ -3,13 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Pico Weather Display</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jura:wght@300..700&family=Rubik+Spray+Paint&display=swap" rel="stylesheet">
+<style>
+    body {
+    background-color: #769FB6;
+}
+.header {
+    text-align: center;
+    background-color: #9DBBAE;
+    margin: 0px;
+    padding: 10px;
+    border-radius: 20px;
+    color: white;
+    font-family: 'Jura', sans-serif;
+}
+.form-container {
+    text-align: center;
+    margin-top: 50px;
+    font-family: 'Jura', sans-serif;
+    background-color: #9DBBAE;
+    border-radius: 20px;
+    padding: 20px;
+    width: 300px;
+    margin: auto;
+    margin-top: 50px;
+    color: white;
+}
+input[type="text"] {
+    width: 90%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+input[type="submit"] {
+    width: 70%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+</style>
 </head>
 <body>
+    <div class="header">
+        <h1>Pico Weather Display</h1>
+    </div>
+    <div class="form-container">
             <form action="./get_location" method="get">
             <label for="location">Enter your closest UK city:</label>
             <input type="text" id="location" name="location"><br><br>
             <input type="submit" value="Submit">
-            </form>
+        </form>
+        <h2>How to Use:</h2>
+        <p>1. Enter the name of your closest UK city and hit submit</p>
+        <p>2. The display will show the current weather information</p>
+        <p>3. Press button A to bring up the status selection screen</p>
+        <p>4. Press button B to choose a status and press button C to confirm</p>
+        <p>5. Press button A twice to exit the status selection screen</p>
+        <p>6. The status will be updated on your chosen webpage</p>
+    </div>
 </body>
 </html>

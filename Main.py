@@ -3,15 +3,19 @@ import network
 from time import sleep
 import credentials
 from PicoOLED13 import OLED_1inch3
-from machine import Pin, RTC
+from machine import Pin, PWM
 import framebuf
 from weather_icons import icon01d, icon02d, icon03d, icon04d, icon09d, icon10d, icon11d, icon13d, icon50d
-import json
 import asyncio
 
 buttonA = Pin(15,Pin.IN,Pin.PULL_UP)
 buttonB = Pin(17,Pin.IN,Pin.PULL_UP)
 buttonC = Pin(16,Pin.IN,Pin.PULL_UP)
+
+buzzer = PWM(Pin(14))
+volume = 1000
+duration = 100
+frequency = 262
 
 OLED = OLED_1inch3()
 ssid = credentials.ssid
@@ -101,12 +105,19 @@ def status():
         if buttonA.value() == 0:
             break
         if buttonC.value() == 0:
+            buzzer_sound(frequency, duration)
             update_status(status)
             break
 async def loading_screen():
     OLED.fill(0x0000)
     OLED.text("Loading...", 5, 28, OLED.white)
     OLED.show()
+
+def buzzer_sound(frequency, duration):
+    buzzer.freq(frequency)
+    buzzer.duty_u16(volume)
+    sleep(duration / 1000)
+    buzzer.duty_u16(0)
 
 def update_status(status):
     url = f'https://api.jsonbin.io/v3/b/{credentials.bin_id}'
@@ -119,22 +130,76 @@ def update_status(status):
     req = requests.put(url, json=data, headers=headers)
 
 def webpage():
-    html = f"""
-            <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Document</title>
-    </head>
-    <body>
-                <form action="./get_location" method="get">
-                <label for="location">Enter your closest UK city:</label>
-                <input type="text" id="location" name="location"><br><br>
-                <input type="submit" value="Submit">
-                </form>
-    </body>
-    </html>
+    html = """
+           <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico Weather Display</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jura:wght@300..700&family=Rubik+Spray+Paint&display=swap" rel="stylesheet">
+<style>
+body {
+    background-color: #769FB6;
+}
+.header {
+    text-align: center;
+    background-color: #9DBBAE;
+    margin: 0px;
+    padding: 10px;
+    border-radius: 20px;
+    color: white;
+    font-family: 'Jura', sans-serif;
+}
+.form-container {
+    text-align: center;
+    margin-top: 50px;
+    font-family: 'Jura', sans-serif;
+    background-color: #9DBBAE;
+    border-radius: 20px;
+    padding: 20px;
+    width: 300px;
+    margin: auto;
+    margin-top: 50px;
+    color: white;
+}
+input[type="text"] {
+    width: 90%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+input[type="submit"] {
+    width: 70%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+</style>
+</head>
+<body>
+    <div class="header">
+        <h1>Pico Weather Display</h1>
+    </div>
+    <div class="form-container">
+            <form action="./get_location" method="get">
+            <label for="location">Enter your closest UK city:</label>
+            <input type="text" id="location" name="location"><br><br>
+            <input type="submit" value="Submit">
+        </form>
+        <h2>How to Use:</h2>
+        <p>1. Enter the name of your closest UK city and hit submit</p>
+        <p>2. The display will show the current weather information</p>
+        <p>3. Press button A to bring up the status selection screen</p>
+        <p>4. Press button B to choose a status and press button C to confirm</p>
+        <p>5. Press button A twice to exit the status selection screen</p>
+        <p>6. The status will be updated on your chosen webpage</p>
+    </div>
+</body>
+</html>
                 """
     return str(html)
 
@@ -190,7 +255,8 @@ async def display(city_name):
 
 async def main():
     connect()
-    await asyncio.start_server(handle_client, "0.0.0.0", 80)
+    server = asyncio.start_server(handle_client, "0.0.0.0", 80)
+    asyncio.create_task(server)
     while user_city is None:
         await asyncio.create_task(loading_screen())
     city_name = user_city
